@@ -11,112 +11,104 @@ import (
 )
 
 type redisCache struct {
-	host    string
-	db      int
+	client  *redis.Client
 	expires time.Duration
 }
 
 func NewRedisCache(host string, db int, exp time.Duration) IPostCache {
+	client := redis.NewClient(&redis.Options{
+		Addr:     host,
+		Password: "",
+		DB:       db,
+	})
+
 	return &redisCache{
-		host:    host,
-		db:      db,
+		client:  client,
 		expires: exp,
 	}
-}
-
-func (cache *redisCache) getClient() *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:     cache.host,
-		Password: "",
-		DB:       cache.db,
-	})
 }
 
 func (cache *redisCache) Set(key string, value *film.FilmResponse) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := cache.getClient()
-
-	json, err := json.Marshal(value)
+	jsonBytes, err := json.Marshal(value)
 	if err != nil {
-		log.Printf("failed to marshal user: %v", err)
+		log.Printf("failed to marshal film: %v", err)
 		return
 	}
 
-	client.Set(ctx, key, string(json), cache.expires*time.Second)
+	err = cache.client.Set(ctx, key, jsonBytes, cache.expires*time.Second).Err()
+	if err != nil {
+		log.Printf("failed to set key %s: %v", key, err)
+	}
 }
 
 func (cache *redisCache) Get(key string) *film.FilmResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := cache.getClient()
-
-	val, err := client.Get(ctx, key).Result()
+	val, err := cache.client.Get(ctx, key).Result()
 	if err != nil {
+		if err != redis.Nil {
+			log.Printf("failed to get key %s: %v", key, err)
+		}
 		return nil
 	}
 
-	user := film.FilmResponse{}
-
-	err = json.Unmarshal([]byte(val), &user)
-	if err != nil {
-		log.Printf("failed to unmarshall user: %v", err)
+	var filmResp film.FilmResponse
+	if err := json.Unmarshal([]byte(val), &filmResp); err != nil {
+		log.Printf("failed to unmarshal film from key %s: %v", key, err)
+		return nil
 	}
 
-	return &user
+	return &filmResp
 }
 
 func (cache *redisCache) GetAll() []*film.FilmResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := cache.getClient()
-
-	var point uint64
-	var users []*film.FilmResponse
+	var cursor uint64
+	var films []*film.FilmResponse
 
 	for {
-		keys, nextPoint, err := client.Scan(ctx, point, "film:*", 100).Result()
+		keys, nextCursor, err := cache.client.Scan(ctx, cursor, "film:*", 100).Result()
 		if err != nil {
-			log.Printf("failed to scan keys from redis: %v", err)
+			log.Printf("failed to scan keys: %v", err)
 			break
 		}
 
 		for _, key := range keys {
-			val, err := client.Get(ctx, key).Result()
+			val, err := cache.client.Get(ctx, key).Result()
 			if err != nil {
-				log.Printf("failed to get value for key %s: %v", key, err)
+				log.Printf("failed to get key %s: %v", key, err)
 				continue
 			}
 
-			var u film.FilmResponse
-			if err := json.Unmarshal([]byte(val), &u); err != nil {
-				log.Printf("failed to unmarshal user from key %s: %v", key, err)
+			var f film.FilmResponse
+			if err := json.Unmarshal([]byte(val), &f); err != nil {
+				log.Printf("failed to unmarshal film from key %s: %v", key, err)
 				continue
 			}
 
-			users = append(users, &u)
+			films = append(films, &f)
 		}
 
-		if nextPoint == 0 {
+		if nextCursor == 0 {
 			break
 		}
-		point = nextPoint
+		cursor = nextCursor
 	}
 
-	return users
-
+	return films
 }
 
 func (cache *redisCache) Delete(key string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := cache.getClient()
-
-	_, err := client.Del(ctx, key).Result()
+	err := cache.client.Del(ctx, key).Err()
 	if err != nil {
 		log.Printf("failed to delete key %s: %v", key, err)
 	}
@@ -126,33 +118,34 @@ func (cache *redisCache) SetStaff(key string, value []*film.Actor) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := cache.getClient()
-
-	json, err := json.Marshal(value)
+	jsonBytes, err := json.Marshal(value)
 	if err != nil {
-		log.Printf("failed to marshal user: %v", err)
+		log.Printf("failed to marshal staff: %v", err)
 		return
 	}
 
-	client.Set(ctx, key, string(json), cache.expires*time.Second)
+	err = cache.client.Set(ctx, key, jsonBytes, cache.expires*time.Second).Err()
+	if err != nil {
+		log.Printf("failed to set staff key %s: %v", key, err)
+	}
 }
 
 func (cache *redisCache) GetByStaffId(id string) []*film.Actor {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := cache.getClient()
 	key := "staff:" + id
-
-	val, err := client.Get(ctx, key).Result()
+	val, err := cache.client.Get(ctx, key).Result()
 	if err != nil {
-		log.Printf("failed to get value for key %s: %v", key, err)
+		if err != redis.Nil {
+			log.Printf("failed to get staff key %s: %v", key, err)
+		}
 		return nil
 	}
 
 	var actors []*film.Actor
 	if err := json.Unmarshal([]byte(val), &actors); err != nil {
-		log.Printf("failed to unmarshal actors from key %s: %v", key, err)
+		log.Printf("failed to unmarshal staff from key %s: %v", key, err)
 		return nil
 	}
 
@@ -163,21 +156,20 @@ func (cache *redisCache) GetPopularFilms() *film.FilmListResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := cache.getClient()
 	key := "popular"
-
-	val, err := client.Get(ctx, key).Result()
-	if err == redis.Nil {
-		log.Printf("value for key %s not found", key)
-		return nil
-	} else if err != nil {
-		log.Printf("failed to get value for key %s: %v", key, err)
+	val, err := cache.client.Get(ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			log.Printf("value for key %s not found", key)
+		} else {
+			log.Printf("failed to get popular films key %s: %v", key, err)
+		}
 		return nil
 	}
 
 	var films film.FilmListResponse
 	if err := json.Unmarshal([]byte(val), &films); err != nil {
-		log.Printf("failed to unmarshal films from key %s: %v", key, err)
+		log.Printf("failed to unmarshal popular films from key %s: %v", key, err)
 		return nil
 	}
 
@@ -188,13 +180,48 @@ func (cache *redisCache) SetPopularFilms(key string, value *film.FilmListRespons
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	client := cache.getClient()
-
-	json, err := json.Marshal(value)
+	jsonBytes, err := json.Marshal(value)
 	if err != nil {
-		log.Printf("failed to marshal user: %v", err)
+		log.Printf("failed to marshal popular films: %v", err)
 		return
 	}
 
-	client.Set(ctx, key, string(json), cache.expires*time.Second)
+	err = cache.client.Set(ctx, key, jsonBytes, cache.expires*time.Second).Err()
+	if err != nil {
+		log.Printf("failed to set popular films key %s: %v", key, err)
+	}
+}
+
+func (cache *redisCache) GetMultiple(keys []string) ([]*film.FilmResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	vals, err := cache.client.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	films := make([]*film.FilmResponse, 0, len(vals))
+	for _, val := range vals {
+		if val == nil {
+			films = append(films, nil)
+			continue
+		}
+
+		strVal, ok := val.(string)
+		if !ok {
+			films = append(films, nil)
+			continue
+		}
+
+		var f film.FilmResponse
+		if err := json.Unmarshal([]byte(strVal), &f); err != nil {
+			films = append(films, nil)
+			continue
+		}
+
+		films = append(films, &f)
+	}
+
+	return films, nil
 }

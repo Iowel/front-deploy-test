@@ -14,8 +14,7 @@ type IPostCache interface {
 
 	GetByStaffId(key string) []*film.Actor
 
-
-
-	GetPopularFilms() *film.FilmListResponse 
+	GetMultiple(keys []string) ([]*film.FilmResponse, error)
+	GetPopularFilms() *film.FilmListResponse
 	SetPopularFilms(key string, value *film.FilmListResponse)
 }

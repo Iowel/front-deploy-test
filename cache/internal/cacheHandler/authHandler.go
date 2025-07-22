@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -167,4 +168,120 @@ func (h *cacheHandler) FetchStaff() http.HandlerFunc {
 		}
 
 	}
+}
+
+//////////////
+
+func (h *cacheHandler) FetchCachesBulk() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		idsParam := r.URL.Query().Get("ids")
+		if idsParam == "" {
+			http.Error(w, "ids param required", http.StatusBadRequest)
+			return
+		}
+
+		idStrs := strings.Split(idsParam, ",")
+		if len(idStrs) == 0 {
+			http.Error(w, "ids param empty", http.StatusBadRequest)
+			return
+		}
+
+		keys := make([]string, 0, len(idStrs))
+		idInts := make([]int, 0, len(idStrs))
+		for _, idStr := range idStrs {
+			id, err := strconv.Atoi(strings.TrimSpace(idStr))
+			if err != nil {
+				continue // пропускаем невалидные ID
+			}
+			idInts = append(idInts, id)
+			keys = append(keys, fmt.Sprintf("film:%d", id))
+		}
+
+		// Получаем сразу все из кеша через MGET
+		filmsFromCache, err := h.Cache.GetMultiple(keys)
+		if err != nil {
+			http.Error(w, "failed to get from cache", http.StatusInternalServerError)
+			return
+		}
+
+		// Найдем ID для которых в кеше nil
+		missingIDs := make([]int, 0)
+		for i, film := range filmsFromCache {
+			if film == nil {
+				missingIDs = append(missingIDs, idInts[i])
+			}
+		}
+
+		// Параллельно загружаем недостающие фильмы из API
+		type result struct {
+			film *film.FilmResponse
+			err  error
+		}
+
+		concurrency := 10 // можно подстроить под сервер
+		sem := make(chan struct{}, concurrency)
+		resultsCh := make(chan result, len(missingIDs))
+
+		for _, id := range missingIDs {
+			sem <- struct{}{}
+			go func(id int) {
+				defer func() { <-sem }()
+				f, err := h.fetchFilmFromAPI(id)
+				resultsCh <- result{film: f, err: err}
+			}(id)
+		}
+
+		// Собираем результаты
+		for i := 0; i < len(missingIDs); i++ {
+			res := <-resultsCh
+			if res.err == nil && res.film != nil {
+				// Кладем в кеш
+				key := fmt.Sprintf("film:%d", res.film.KinopoiskID)
+				h.Cache.Set(key, res.film)
+				// Добавляем в общий слайс
+				filmsFromCache = append(filmsFromCache, res.film)
+			}
+		}
+
+		close(resultsCh)
+		close(sem)
+
+		response.Json(w, filmsFromCache, http.StatusOK)
+		log.Printf("Time Duration (bulk): %s", time.Since(start))
+	}
+}
+
+// вынесем вызов API в отдельную функцию
+func (h *cacheHandler) fetchFilmFromAPI(id int) (*film.FilmResponse, error) {
+	url := fmt.Sprintf("https://kinopoiskapiunofficial.tech/api/v2.2/films/%d", id)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-API-KEY", h.Config.ApiKey.ApiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("api status: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var f film.FilmResponse
+	if err := json.Unmarshal(body, &f); err != nil {
+		return nil, err
+	}
+
+	return &f, nil
 }
