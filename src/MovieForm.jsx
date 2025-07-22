@@ -3,6 +3,7 @@ import { useState } from 'react';
 export default function MovieForm({ onAdd }) {
   const [title, setTitle] = useState('');
 
+
   
   const handleSubmit = (e) => {
     e.preventDefault();
