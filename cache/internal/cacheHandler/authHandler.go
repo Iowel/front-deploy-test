@@ -30,6 +30,7 @@ func NewCacheHandler(router *http.ServeMux, cacheRepo cache.IPostCache, Config *
 	}
 
 	router.Handle("GET /api/get-cache/{id}", handler.FetchCache())
+	router.Handle("GET /api/get-caches", handler.FetchCachesBulk())
 	router.Handle("GET /api/get-staff/{id}", handler.FetchStaff())
 }
 
