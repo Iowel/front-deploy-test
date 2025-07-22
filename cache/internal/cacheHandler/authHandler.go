@@ -19,6 +19,7 @@ type cacheHandler struct {
 	Config *configs.Config
 }
 
+
 func NewCacheHandler(router *http.ServeMux, cacheRepo cache.IPostCache, Config *configs.Config) {
 	handler := &cacheHandler{
 		Cache:  cacheRepo,
