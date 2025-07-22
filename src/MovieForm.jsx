@@ -8,6 +8,7 @@ export default function MovieForm({ onAdd }) {
     if (!title.trim()) return;
     onAdd(title.trim());
     setTitle('');
+    
   };
 
   return (
