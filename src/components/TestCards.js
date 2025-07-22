@@ -95,7 +95,7 @@ function generateRandomSessions() {
 
 const TestCards = () => {
   const [movies, setMovies] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const { date } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -196,47 +196,50 @@ const TestCards = () => {
 
   // Обновляем зависимости для загрузки фильмов
   useEffect(() => {
-    if (!movieIds || movieIds.length === 0) return;
+    const fetchFilmsBulk = async () => {
+      setLoading(true);
 
-    async function fetchMovies() {
-      const movieDataArray = [];
+      const cachedMovies = [];
+      const uncachedIds = [];
 
-      for (const id of movieIds) {
-        const cacheKey = `movie_${id}`;
-        let data = null;
-
-        const cached = localStorage.getItem(cacheKey);
+      // 1. Проверяем кэш
+      movieIds.forEach((movieId) => {
+        const cached = localStorage.getItem(`movie_${movieId}`);
         if (cached) {
-          try {
-            data = JSON.parse(cached);
-          } catch {
-            localStorage.removeItem(cacheKey);
-          }
+          cachedMovies.push(JSON.parse(cached));
+        } else {
+          uncachedIds.push(movieId);
         }
+      });
 
-        if (!data) {
-          try {
-            const res = await fetch(`/api/get-cache/${id}`, {
-              headers: { 'Content-Type': 'application/json' }
-            });
-            if (res.ok) {
-              data = await res.json();
-              localStorage.setItem(cacheKey, JSON.stringify(data));
-            }
-          } catch {
-            console.warn(`Ошибка загрузки данных для фильма ${id}`);
-          }
-        }
+      let fetchedMovies = [];
 
-        if (data) {
-          movieDataArray.push(data);
+      // 2. Делаем один bulk-запрос для всех отсутствующих
+      if (uncachedIds.length > 0) {
+        try {
+          const params = new URLSearchParams();
+          uncachedIds.forEach((id) => params.append('ids', id));
+
+          const res = await fetch(`/api/get-caches?${params.toString()}`);
+          const data = await res.json();
+
+          // сохраняем в localStorage
+          data.forEach((movie) => {
+            localStorage.setItem(`movie_${movie.movieId}`, JSON.stringify(movie));
+          });
+
+          fetchedMovies = data;
+        } catch (err) {
+          console.error('Ошибка при загрузке фильмов:', err);
         }
       }
 
-      setMovies(movieDataArray);
-    }
+      // 3. Объединяем и обновляем состояние
+      setMovies([...cachedMovies, ...fetchedMovies]);
+      setLoading(false);
+    };
 
-    fetchMovies();
+    fetchFilmsBulk();
   }, [movieIds]);
 
   // Обновляем эффект для отображения фильмов
