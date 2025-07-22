@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import Modal from './Modal';
-import CacheService from '../services/cacheService';
+// import CacheService from '../services/cacheService';
 import { getNextApiKey } from '../apiKeys';
 
 // Форматирование цены

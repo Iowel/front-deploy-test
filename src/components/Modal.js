@@ -5,7 +5,7 @@ import PaymentStepButton, { PaymentStep } from './payment';
 import StepConnector from './StepConnector';
 import SeatsGrid from './SeatsGrid';
 import Loader from './Loader';
-import CacheService from '../services/cacheService';
+// import CacheService from '../services/cacheService';
 import { getNextApiKey } from '../apiKeys';
 
 // Форматирование цены
@@ -60,29 +60,30 @@ export default function Modal({ open, onClose, movie, session, showStepper = tru
 
   // Загружаем подробную инфу о фильме по id и staff
   useEffect(() => {
-    if (open && movie?.movieId) {
-      setDetails(null);
-      setStaff([]);
+    if (!open || !movie?.movieId) return;
   
-      fetch(`/api/get-cache/${movie.movieId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-        .then(res => res.json())
-        .then(data => setDetails(data))
-        .catch(() => setDetails(null));
+    console.log("Fetching movie details for:", movie.movieId);
   
-      fetch(`/api/get-staff/${movie.movieId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-        .then(res => res.json())
-        .then(data => setStaff(data))
-        .catch(() => setStaff([]));
-    }
-  }, [open, movie]);
+    setDetails(null);
+    setStaff([]);
+  
+    fetch(`/api/get-cache/${movie.movieId}`)
+      .then(res => res.json())
+      .then(data => setDetails(data))
+      .catch(err => {
+        console.error("Ошибка получения get-cache:", err);
+        setDetails(null);
+      });
+  
+    fetch(`/api/get-staff/${movie.movieId}`)
+      .then(res => res.json())
+      .then(data => setStaff(data))
+      .catch(err => {
+        console.error("Ошибка получения get-staff:", err);
+        setStaff([]);
+      });
+  }, [open, movie?.movieId]);
+  
 
 
 
