@@ -151,8 +151,7 @@ const TestCards = () => {
     return getDateFromLocal(date);
   });
 
-  const [allMoviesData, setAllMoviesData] = useState({});
-  const [currentDate, setCurrentDate] = useState(todayFormatted);
+
 
   // Эффект для отслеживания смены дня
   useEffect(() => {
@@ -177,28 +176,51 @@ const TestCards = () => {
     return () => clearInterval(interval);
   }, [currentDate, date, navigate]);
 
+
+
+
+
+  const [allMoviesData, setAllMoviesData] = useState({});
+  const [currentDate, setCurrentDate] = useState(getDateFromLocal(getTodayLocal()));
+
+
+
   // Обновляем зависимости для загрузки фильмов
   useEffect(() => {
-    const fetchMovies = async () => {
+    async function loadMovies() {
+      setLoading(true);
+
       try {
+        // Проверяем кеш
+        const cacheRaw = localStorage.getItem(CACHE_KEY);
+        let cached = null;
+        if (cacheRaw) {
+          cached = JSON.parse(cacheRaw);
+          // Проверяем срок годности кеша
+          if (Date.now() - cached.timestamp > CACHE_TTL) {
+            cached = null; // кеш устарел
+          }
+        }
+
+        if (cached && cached.data) {
+          setAllMoviesData(cached.data);
+          setLoading(false);
+          return;
+        }
+
+        // Если кеша нет или он устарел — делаем fetch
         const newAllMoviesData = {};
-        const manualMovies = [];
         const movieIds = [
-          4443734, 1237984, 5504100, 5518231, 5427621, 1115213, 1320476, 5965493, 4476147, 6224943, 7004437, 5001443, 5304486, 7224468
+          4443734, 1237984, 5504100, 5518231, 5427621, 1115213, 1320476, 5965493,
+          4476147, 6224943, 7004437, 5001443, 5304486, 7224468
         ];
-        const sessionTemplate = generateRandomSessions();
 
-        // Новый диапазон дат
-        const start = getTodayLocal(); // начало сегодня (00:00)
-        const end = new Date(start);
-        end.setDate(end.getDate() + 40); // 40 дней вперёд
-
-        let day = 0;
-
+        const start = getTodayLocal();
         for (let day = 0; day <= 40; day++) {
-        const d = new Date(start);
-        d.setDate(d.getDate() + day);
-        const dateStr = getDateFromLocal(d);
+          const d = new Date(start);
+          d.setDate(d.getDate() + day);
+          const dateStr = getDateFromLocal(d);
+
           // Перемешиваем movieIds для каждого дня
           const shuffledIds = [...movieIds];
           for (let i = shuffledIds.length - 1; i > 0; i--) {
@@ -207,25 +229,23 @@ const TestCards = () => {
           }
           const idsForDay = shuffledIds.slice(0, 5);
           newAllMoviesData[dateStr] = [];
+
           for (let i = 0; i < 5; i++) {
             const movieId = idsForDay[i];
             let info = null;
             try {
-              // const resp = await fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movieId}`, {
               const resp = await fetch(`/api/get-cache/${movieId}`, {
-                headers: {
-                  'Content-Type': 'application/json',
-                }
+                headers: { 'Content-Type': 'application/json' }
               });
-              if (resp.status === 429) { // Rate limit exceeded
-                await new Promise(resolve => setTimeout(resolve, 1000)); // ждем 1 секунду
-                i--; // уменьшаем индекс, чтобы повторить попытку того же фильма
+              if (resp.status === 429) {
+                await new Promise(r => setTimeout(r, 1000));
+                i--;
                 continue;
               }
               info = await resp.json();
             } catch (error) {
               console.error(`Ошибка при загрузке фильма ${movieId}:`, error);
-              continue; // Skip this movie on error
+              continue;
             }
             if (info) {
               newAllMoviesData[dateStr].push({
@@ -242,14 +262,20 @@ const TestCards = () => {
         }
 
         setAllMoviesData(newAllMoviesData);
+        // Сохраняем кеш с меткой времени
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          timestamp: Date.now(),
+          data: newAllMoviesData,
+        }));
         setLoading(false);
       } catch (error) {
         console.error('Ошибка при загрузке фильмов:', error);
         setLoading(false);
       }
-    };
+    }
 
-    fetchMovies();
+    loadMovies();
+
   }, [currentDate]);
 
   // Обновляем эффект для отображения фильмов
