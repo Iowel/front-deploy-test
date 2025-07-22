@@ -4,7 +4,7 @@ export default function MovieForm({ onAdd }) {
   const [title, setTitle] = useState('');
 
 
-  
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
@@ -13,6 +13,7 @@ export default function MovieForm({ onAdd }) {
 
   };
 
+  
 
 
   return (
