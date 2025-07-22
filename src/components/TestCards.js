@@ -182,65 +182,65 @@ const TestCards = () => {
     const fetchMovies = async () => {
       try {
         const newAllMoviesData = {};
+        const manualMovies = [];
         const movieIds = [
-          4443734, 1237984, 5504100, 5518231, 5427621, 1115213, 1320476, 5965493,
-          4476147, 6224943, 7004437, 5001443, 5304486, 7224468
+          4443734, 1237984, 5504100, 5518231, 5427621, 1115213, 1320476, 5965493, 4476147, 6224943, 7004437, 5001443, 5304486, 7224468
         ];
-        
+        const sessionTemplate = generateRandomSessions();
+
         // Новый диапазон дат
-        const start = new Date('2025-07-22');
-        const end = new Date('2025-09-01');
-        
-        // Выполним один запрос с передачей всех movieIds в параметрах
-        const idsParam = movieIds.join(',');
-        const resp = await fetch(`/api/get-caches?ids=${encodeURIComponent(idsParam)}`, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        if (!resp.ok) {
-          throw new Error(`Ошибка загрузки фильмов: ${resp.status}`);
-        }
-        
-        // Предположим, что ответ — массив с информацией по фильмам, где каждый элемент содержит movieId и остальные данные
-        const moviesData = await resp.json();
-        
-        // Индексируем фильмы по movieId для быстрого доступа
-        const moviesDataById = {};
-        moviesData.forEach(info => {
-          moviesDataById[info.movieId] = info;
-        });
-        
+        const start = getTodayLocal(); // начало сегодня (00:00)
+        const end = new Date(start);
+        end.setDate(end.getDate() + 40); // 40 дней вперёд
+
         let day = 0;
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1), day++) {
-          const dateStr = getDateFromLocal(new Date(d));
-          
+
+        for (let day = 0; day <= 40; day++) {
+        const d = new Date(start);
+        d.setDate(d.getDate() + day);
+        const dateStr = getDateFromLocal(d);
           // Перемешиваем movieIds для каждого дня
           const shuffledIds = [...movieIds];
           for (let i = shuffledIds.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [shuffledIds[i], shuffledIds[j]] = [shuffledIds[j], shuffledIds[i]];
           }
-          
           const idsForDay = shuffledIds.slice(0, 5);
           newAllMoviesData[dateStr] = [];
-          
           for (let i = 0; i < 5; i++) {
             const movieId = idsForDay[i];
-            const info = moviesDataById[movieId];
-            if (!info) continue; // Если по каким-то причинам нет данных для этого movieId, пропускаем
-            
-            newAllMoviesData[dateStr].push({
-              movieId,
-              nameRu: info.nameRu || '',
-              posterUrl: info.posterUrl || info.posterUrlPreview || '',
-              genres: info.genres || [],
-              times: filterSessions(generateRandomSessions(), dateStr),
-              date: dateStr,
-              staff: []
-            });
+            let info = null;
+            try {
+              // const resp = await fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movieId}`, {
+              const resp = await fetch(`/api/get-cache/${movieId}`, {
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+              if (resp.status === 429) { // Rate limit exceeded
+                await new Promise(resolve => setTimeout(resolve, 1000)); // ждем 1 секунду
+                i--; // уменьшаем индекс, чтобы повторить попытку того же фильма
+                continue;
+              }
+              info = await resp.json();
+            } catch (error) {
+              console.error(`Ошибка при загрузке фильма ${movieId}:`, error);
+              continue; // Skip this movie on error
+            }
+            if (info) {
+              newAllMoviesData[dateStr].push({
+                movieId,
+                nameRu: info.nameRu || '',
+                posterUrl: info.posterUrl || info.posterUrlPreview || '',
+                genres: info.genres || [],
+                times: filterSessions(generateRandomSessions(), dateStr),
+                date: dateStr,
+                staff: []
+              });
+            }
           }
         }
-        
+
         setAllMoviesData(newAllMoviesData);
         setLoading(false);
       } catch (error) {
@@ -248,10 +248,9 @@ const TestCards = () => {
         setLoading(false);
       }
     };
-  
+
     fetchMovies();
   }, [currentDate]);
-  
 
   // Обновляем эффект для отображения фильмов
   useEffect(() => {
