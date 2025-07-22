@@ -218,12 +218,14 @@ const TestCards = () => {
           }
         });
 
-        if (resp.status === 429) { // если лимит запросов
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          continue;
+        if (!resp.ok) {
+          const text = await resp.text();
+          console.error(`Ошибка при fetch /api/get-cache/${movieId}:`, resp.status, text);
+          throw new Error(`HTTP ${resp.status}`);
         }
-
-        const info = await resp.json();
+        
+        const movieInfo = await resp.json();
+        
         movieInfoCache[movieId] = info;
       }
 
