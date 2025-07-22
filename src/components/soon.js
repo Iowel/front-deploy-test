@@ -25,14 +25,12 @@ const Soon = () => {
       try {
         // Fetch топ-100
         const topResp = await fetch('https://kinopoiskapiunofficial.tech/api/v2.2/films/top?type=TOP_100_POPULAR_FILMS', {
-          // const topResp = await fetch('http://localhost:8888/api/get-popular', {
           headers: {
-            'X-API-KEY': '48e848a4-1bc2-4ed7-9d15-d05f950d3f4f',
+            'X-API-KEY': 'f8730f72-a86f-42c5-971a-cbb75304a8b6',
             'Content-Type': 'application/json',
           }
         });
         const topData = await topResp.json();
-        console.log('soon.js API films:', topData.films?.length, topData.films);
         const films = topData.films || [];
         let soonMovies = [];
         if (films.length > 39) {
@@ -70,7 +68,6 @@ const Soon = () => {
           justifyContent: 'center',
         }}>
           {movies.map((movie, idx) => {
-            console.log('SOON_CARD', movie.nameRu || movie.nameEn || movie.nameOriginal, 'KP:', movie.ratingKinopoisk, 'IMDb:', movie.ratingImdb);
             return (
               <div
                 key={movie.filmId || movie.kinopoiskId || idx}

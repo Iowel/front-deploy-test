@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import Modal from './Modal';
-// import CacheService from '../services/cacheService';
-import { getNextApiKey } from '../apiKeys';
 
 // Форматирование цены
 const formatPrice = (price) => {
@@ -189,65 +187,55 @@ const TestCards = () => {
           4443734, 1237984, 5504100, 5518231, 5427621, 1115213, 1320476, 5965493, 4476147, 6224943, 7004437, 5001443, 5304486, 7224468
         ];
         const sessionTemplate = generateRandomSessions();
-        const start = new Date('2025-05-20');
-        const end = new Date('2025-06-20');
+        // Новый диапазон дат
+        const start = new Date('2025-07-22');
+        const end = new Date('2025-09-01');
         let day = 0;
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1), day++) {
           const dateStr = getDateFromLocal(new Date(d));
-          const idsForDay = [];
-          let offset = day % movieIds.length;
+          // Перемешиваем movieIds для каждого дня
+          const shuffledIds = [...movieIds];
+          for (let i = shuffledIds.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledIds[i], shuffledIds[j]] = [shuffledIds[j], shuffledIds[i]];
+          }
+          const idsForDay = shuffledIds.slice(0, 5);
+          newAllMoviesData[dateStr] = [];
           for (let i = 0; i < 5; i++) {
-            idsForDay.push(movieIds[(offset + i) % movieIds.length]);
-          }
-          idsForDay.forEach(movieId => {
-            manualMovies.push({
-              movieId,
-              date: dateStr,
-              sessions: sessionTemplate
-            });
-          });
-        }
-
-        const movieInfoCache = {};
-
-
-      for (const movieId of movieIds) {
-        const resp = await fetch(`/api/get-cache/${movieId}`, {
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (!resp.ok) {
-          const text = await resp.text();
-          console.error(`Ошибка при fetch /api/get-cache/${movieId}:`, resp.status, text);
-          throw new Error(`HTTP ${resp.status}`);
-        }
-        
-        const movieInfo = await resp.json();
-        
-        movieInfoCache[movieId] = info;
-      }
-
-        for (const { movieId, date } of manualMovies) {
-          const info = movieInfoCache[movieId];
-          if (!newAllMoviesData[date]) newAllMoviesData[date] = [];
-          if (!newAllMoviesData[date].some(m => m.movieId === movieId)) {
-            newAllMoviesData[date].push({
-              movieId,
-              nameRu: info?.nameRu || '',
-              posterUrl: info?.posterUrl || info?.posterUrlPreview || '',
-              genres: info?.genres || [],
-              times: filterSessions(generateRandomSessions(), date),
-              date,
-              staff: []
-            });
+            const movieId = idsForDay[i];
+            let info = null;
+            try {
+              // const resp = await fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movieId}`, {
+              const resp = await fetch(`/api/get-cache/${movieId}`, {
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+              if (resp.status === 429) { // Rate limit exceeded
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+                continue; // Retry with next API key
+              }
+              info = await resp.json();
+            } catch (error) {
+              console.error(`Ошибка при загрузке фильма ${movieId}:`, error);
+              continue; // Skip this movie on error
+            }
+            if (info) {
+              newAllMoviesData[dateStr].push({
+                movieId,
+                nameRu: info.nameRu || '',
+                posterUrl: info.posterUrl || info.posterUrlPreview || '',
+                genres: info.genres || [],
+                times: filterSessions(generateRandomSessions(), dateStr),
+                date: dateStr,
+                staff: []
+              });
+            }
           }
         }
 
         setAllMoviesData(newAllMoviesData);
         setLoading(false);
-
       } catch (error) {
         console.error('Ошибка при загрузке фильмов:', error);
         setLoading(false);

@@ -5,8 +5,6 @@ import PaymentStepButton, { PaymentStep } from './payment';
 import StepConnector from './StepConnector';
 import SeatsGrid from './SeatsGrid';
 import Loader from './Loader';
-// import CacheService from '../services/cacheService';
-import { getNextApiKey } from '../apiKeys';
 
 // Форматирование цены
 const formatPrice = (price) => {
@@ -55,43 +53,31 @@ export default function Modal({ open, onClose, movie, session, showStepper = tru
   const onZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 1.5));
   const onZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.7));
 
-  // DEBUG LOGS
-  console.log('status:', status, 'selectedSeats:', selectedSeats, 'session:', session, 'selectedSession:', selectedSession, 'open:', open, 'movie:', movie);
-
   // Загружаем подробную инфу о фильме по id и staff
   useEffect(() => {
-    if (!open || !movie?.movieId) return;
-  
-    console.log("Fetching movie details for:", movie.movieId);
-  
-    setDetails(null);
-    setStaff([]);
-  
-    fetch(`/api/get-cache/${movie.movieId}`)
-      .then(res => res.json())
-      .then(data => setDetails(data))
-      .catch(err => {
-        console.error("Ошибка получения get-cache:", err);
-        setDetails(null);
-      });
-  
-    fetch(`/api/get-staff/${movie.movieId}`)
-      .then(res => res.json())
-      .then(data => setStaff(data))
-      .catch(err => {
-        console.error("Ошибка получения get-staff:", err);
-        setStaff([]);
-      });
-  }, [open, movie?.movieId]);
-  
-
-
-
-
-
-
-
-
+    if (open && movie?.movieId) {
+      setDetails(null);
+      setStaff([]);
+      // fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movie.movieId}`, {
+      fetch(`/api/get-cache/${movie.movieId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+        .then(res => res.json())
+        .then(data => setDetails(data))
+        .catch(() => setDetails(null));
+      // fetch(`https://kinopoiskapiunofficial.tech/api/v1/staff?filmId=${movie.movieId}`, {
+        fetch(`/api/get-staff/${movie.movieId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+          }
+      })
+        .then(res => res.json())
+        .then(data => setStaff(data))
+        .catch(() => setStaff([]));
+      }
+  }, [open, movie]);
 
   // seats генерируем динамически для каждого фильма/сеанса
   useEffect(() => {
@@ -314,13 +300,6 @@ export default function Modal({ open, onClose, movie, session, showStepper = tru
                           seen.add(key);
                         }
                       }
-                      // DEBUG
-                      const now = new Date();
-                      const todayStr = normalizeDate(now.toISOString());
-                      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-                      const tomorrowStr = normalizeDate(tomorrow.toISOString());
-                      console.log('allSessions:', movie.allSessions);
-                      console.log('todayStr:', todayStr, 'tomorrowStr:', tomorrowStr);
                       // Группируем по нормализованной дате
                       const sessionsByDate = uniqueSessions.reduce((acc, s) => {
                         const normDate = normalizeDate(s.date);
@@ -329,6 +308,7 @@ export default function Modal({ open, onClose, movie, session, showStepper = tru
                         return acc;
                       }, {});
                       // Универсально: ближайшие две даты >= сегодня
+                      const todayStr = normalizeDate(new Date().toISOString());
                       const allDates = Object.keys(sessionsByDate).sort();
                       const filteredDates = allDates.filter(date => date >= todayStr).slice(0, 2);
                       if (filteredDates.length === 0) return <div className="text-gray-400 text-sm mt-8">Нет сеансов</div>;

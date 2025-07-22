@@ -19,7 +19,6 @@ type cacheHandler struct {
 	Config *configs.Config
 }
 
-
 func NewCacheHandler(router *http.ServeMux, cacheRepo cache.IPostCache, Config *configs.Config) {
 	handler := &cacheHandler{
 		Cache:  cacheRepo,
@@ -55,7 +54,7 @@ func (h *cacheHandler) FetchCache() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		req.Header.Set("X-API-KEY", "48e848a4-1bc2-4ed7-9d15-d05f950d3f4f")
+		req.Header.Set("X-API-KEY", h.Config.ApiKey.ApiKey)
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := http.DefaultClient.Do(req)
