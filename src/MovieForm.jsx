@@ -14,9 +14,6 @@ export default function MovieForm({ onAdd }) {
   };
 
 
-  
-
-
 
 
   return (
