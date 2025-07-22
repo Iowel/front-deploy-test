@@ -1,23 +1,12 @@
-import React, { useState } from 'react';
-import MovieList from './MovieList';
-import MovieForm from './MovieForm';
-import './style.css';
+import React from 'react';
+import { MovieList } from './components/MovieList';
 
-export default function App() {
-  const [movies, setMovies] = useState([
-    { id: 1, title: 'Inception' },
-    { id: 2, title: 'Interstellar' },
-  ]);
-
-  const addMovie = (title) => {
-    setMovies([...movies, { id: Date.now(), title }]);
-  };
-
+function App() {
   return (
-    <div className="container">
-      <h1>🎬 Movie List</h1>
-      <MovieForm onAdd={addMovie} />
-      <MovieList movies={movies} />
+    <div className="min-h-screen bg-gray-100">
+      <MovieList />
     </div>
   );
 }
+
+export default App; 

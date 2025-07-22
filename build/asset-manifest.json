@@ -1,0 +1,29 @@
+{
+  "files": {
+    "main.css": "/static/css/main.a7fdc24e.css",
+    "main.js": "/static/js/main.833755c5.js",
+    "static/media/logo.png": "/static/media/logo.ab949058b10e1d19ee0b.png",
+    "static/media/na4jd.webp": "/static/media/na4jd.9153b78fc5bf324dd6de.webp",
+    "static/media/smile_box.jpg": "/static/media/smile_box.67f99591152d63837303.jpg",
+    "static/media/cert.jpg": "/static/media/cert.2269b64025c336996c8c.jpg",
+    "static/media/b-day_kino.jpg": "/static/media/b-day_kino.45d9ea83f5b025166b01.jpg",
+    "static/media/sales.jpg": "/static/media/sales.ca2af4270d3699a908dd.jpg",
+    "static/media/kino_rent.jpg": "/static/media/kino_rent.a6d56e854df1bc82e25a.jpg",
+    "static/media/grom.webp": "/static/media/grom.e5094582e75fe6da24ed.webp",
+    "static/media/art_lekt.jpg": "/static/media/art_lekt.d41badd89e10c4a4b10b.jpg",
+    "static/media/logo_trenspng.png": "/static/media/logo_trenspng.dd06d7bc2c5199d809f3.png",
+    "static/media/slick.svg": "/static/media/slick.2630a3e3eab21c607e21.svg",
+    "static/media/slick.eot": "/static/media/slick.a4e97f5a2a64f0ab1323.eot",
+    "static/media/slick.ttf": "/static/media/slick.c94f7671dcc99dce43e2.ttf",
+    "static/media/bank_card.svg": "/static/media/bank_card.5450189142d1a7cdcac262eec5f46333.svg",
+    "static/media/slick.woff": "/static/media/slick.295183786cd8a1389865.woff",
+    "index.html": "/index.html",
+    "static/media/sbp.svg": "/static/media/sbp.c88c711f86db692b5294cd11238a8556.svg",
+    "main.a7fdc24e.css.map": "/static/css/main.a7fdc24e.css.map",
+    "main.833755c5.js.map": "/static/js/main.833755c5.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.a7fdc24e.css",
+    "static/js/main.833755c5.js"
+  ]
+}
