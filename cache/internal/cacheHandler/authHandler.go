@@ -13,11 +13,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type cacheHandler struct {
 	Cache  cache.IPostCache
 	Config *configs.Config
+	group  singleflight.Group
 }
 
 func NewCacheHandler(router *http.ServeMux, cacheRepo cache.IPostCache, Config *configs.Config) {
@@ -43,48 +46,49 @@ func (h *cacheHandler) FetchCache() http.HandlerFunc {
 
 		cacheKey := fmt.Sprintf("film:%d", id)
 		cached := h.Cache.Get(cacheKey)
-		if cached != nil && cached.KinopoiskID == id {
+		if cached != nil {
 			response.Json(w, cached, http.StatusOK)
-			log.Printf("Time Duration (cache): %s", time.Since(start))
 			return
 		}
 
-		url := fmt.Sprintf("https://kinopoiskapiunofficial.tech/api/v2.2/films/%d", id)
-		req, err := http.NewRequest("GET", url, nil)
+		v, err, _ := h.group.Do(cacheKey, func() (interface{}, error) {
+			// Этот код вызовется только ОДИН раз на ключ
+			log.Printf("Calling API for ID %d", id)
+
+			url := fmt.Sprintf("https://kinopoiskapiunofficial.tech/api/v2.2/films/%d", id)
+			req, _ := http.NewRequest("GET", url, nil)
+			req.Header.Set("X-API-KEY", h.Config.ApiKey.ApiKey)
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return nil, err
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				return nil, fmt.Errorf("api error: %s", string(body))
+			}
+
+			body, _ := io.ReadAll(resp.Body)
+			var film film.FilmResponse
+			if err := json.Unmarshal(body, &film); err != nil {
+				return nil, err
+			}
+
+			// положим в кэш
+			h.Cache.Set(cacheKey, &film)
+
+			return &film, nil
+		})
+
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		req.Header.Set("X-API-KEY", h.Config.ApiKey.ApiKey)
-		req.Header.Set("Content-Type", "application/json")
 
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer resp.Body.Close()
+		response.Json(w, v, http.StatusOK)
 
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			http.Error(w, string(body), resp.StatusCode)
-			return
-		}
-
-		var film film.FilmResponse
-		if err := json.Unmarshal(body, &film); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		h.Cache.Set(cacheKey, &film)
-
-		response.Json(w, &film, http.StatusOK)
 		log.Printf("Time Duration (api): %s", time.Since(start))
 	}
 }
