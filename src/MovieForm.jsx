@@ -12,6 +12,7 @@ export default function MovieForm({ onAdd }) {
   };
 
   
+
   return (
     <form onSubmit={handleSubmit}>
       <input
