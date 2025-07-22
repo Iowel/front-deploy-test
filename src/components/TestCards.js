@@ -7,6 +7,10 @@ const formatPrice = (price) => {
   return `${price} ₽`;
 };
 
+
+
+const CACHE_TTL = 3600; // время в секундах или миллисекундах
+
 // Фильтрация сеансов
 const filterSessions = (sessions, targetDate) => {
   const now = new Date();
@@ -179,7 +183,7 @@ const TestCards = () => {
 
 
 
-  
+
 
   const [allMoviesData, setAllMoviesData] = useState({});
   const [currentDate, setCurrentDate] = useState(getDateFromLocal(getTodayLocal()));
@@ -193,7 +197,7 @@ const TestCards = () => {
 
       try {
         // Проверяем кеш
-        const cacheRaw = localStorage.getItem(CACHE_KEY);
+        const cacheRaw = localStorage.getItem(cacheKey);
         let cached = null;
         if (cacheRaw) {
           cached = JSON.parse(cacheRaw);
@@ -264,10 +268,8 @@ const TestCards = () => {
 
         setAllMoviesData(newAllMoviesData);
         // Сохраняем кеш с меткой времени
-        localStorage.setItem(CACHE_KEY, JSON.stringify({
-          timestamp: Date.now(),
-          data: newAllMoviesData,
-        }));
+        const cacheKey = `movie_${movieId}`;
+        localStorage.setItem(cacheKey, JSON.stringify(data));
         setLoading(false);
       } catch (error) {
         console.error('Ошибка при загрузке фильмов:', error);
