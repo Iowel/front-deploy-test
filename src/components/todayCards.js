@@ -76,12 +76,11 @@ const TodayCards = () => {
         const moviePromises = moviesForDate.map(async (movieData) => {
           // const response = await fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movieData.movieId}`, {
             const resp = await fetch(`/api/get-cache/${movieData.movieId}`, {
-            headers: {
-              'X-API-KEY': '48e848a4-1bc2-4ed7-9d15-d05f950d3f4f',
-              'Content-Type': 'application/json',
-            }
-          });
-          const movieInfo = await response.json();
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+            const movieInfo = await resp.json();
           return {
             ...movieInfo,
             times: movieData.times
