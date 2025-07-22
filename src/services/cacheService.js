@@ -8,23 +8,32 @@ class CacheService {
       timestamp: Date.now(),
       ttl
     };
-    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(item));
+    try {
+      localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(item));
+    } catch (e) {
+      console.warn('CacheService set error:', e);
+    }
   }
 
   static get(key) {
-    const item = localStorage.getItem(CACHE_PREFIX + key);
-    if (!item) return null;
+    const itemStr = localStorage.getItem(CACHE_PREFIX + key);
+    if (!itemStr) return null;
 
-    const { data, timestamp, ttl } = JSON.parse(item);
-    const now = Date.now();
+    try {
+      const { data, timestamp, ttl } = JSON.parse(itemStr);
+      const now = Date.now();
 
-    // Проверяем не истек ли срок хранения
-    if (now - timestamp > ttl) {
+      // Проверяем не истек ли срок хранения
+      if (now - timestamp > ttl) {
+        localStorage.removeItem(CACHE_PREFIX + key);
+        return null;
+      }
+      return data;
+    } catch (e) {
+      console.warn('CacheService get error parsing JSON:', e);
       localStorage.removeItem(CACHE_PREFIX + key);
       return null;
     }
-
-    return data;
   }
 
   static remove(key) {
@@ -38,32 +47,43 @@ class CacheService {
   }
 
   static getStats() {
-    const keys = Object.keys(localStorage)
-      .filter(key => key.startsWith(CACHE_PREFIX));
-    
+    const keys = Object.keys(localStorage).filter(key => key.startsWith(CACHE_PREFIX));
+
     return {
       totalItems: keys.length,
       items: keys.map(key => {
-        const item = JSON.parse(localStorage.getItem(key));
-        return {
-          key: key.replace(CACHE_PREFIX, ''),
-          age: Date.now() - item.timestamp,
-          ttl: item.ttl
-        };
+        try {
+          const item = JSON.parse(localStorage.getItem(key));
+          return {
+            key: key.replace(CACHE_PREFIX, ''),
+            age: Date.now() - item.timestamp,
+            ttl: item.ttl
+          };
+        } catch {
+          return {
+            key: key.replace(CACHE_PREFIX, ''),
+            age: null,
+            ttl: null
+          };
+        }
       })
     };
   }
 
-  // Новые методы для работы с сеансами
+  // Методы для кеширования сеансов (sessions)
+
   static setSessions(movieId, date, sessions) {
-    const key = `sessions_${movieId}_${date}`;
+    const dateStr = String(date);
+    const key = `sessions_${movieId}_${dateStr}`;
+    console.log('Cache set sessions:', key, sessions);
     this.set(key, sessions);
   }
 
   static getSessions(movieId, date) {
-    const key = `sessions_${movieId}_${date}`;
+    const dateStr = String(date);
+    const key = `sessions_${movieId}_${dateStr}`;
     return this.get(key);
   }
 }
 
-export default CacheService; 
+export default CacheService;
