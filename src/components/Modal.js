@@ -66,7 +66,7 @@ export default function Modal({ open, onClose, movie, session, showStepper = tru
       // fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movie.movieId}`, {
         fetch(`/api/get-cache/${movie.movieId}`, {
         headers: {
-          'X-API-KEY': getNextApiKey(),
+          // 'X-API-KEY': getNextApiKey(),
           'Content-Type': 'application/json',
         }
       })
@@ -76,7 +76,7 @@ export default function Modal({ open, onClose, movie, session, showStepper = tru
       // fetch(`https://kinopoiskapiunofficial.tech/api/v1/staff?filmId=${movie.movieId}`, {
         fetch(`/api/get-staff/${movie.movieId}`, {
           headers: {
-          'X-API-KEY': getNextApiKey(),
+          // 'X-API-KEY': getNextApiKey(),
             'Content-Type': 'application/json',
           }
       })

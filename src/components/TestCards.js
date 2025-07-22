@@ -216,7 +216,7 @@ const TestCards = () => {
             // const resp = await fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movieId}`, {
               const resp = await fetch(`/api/get-cache/${movieId}`, {
               headers: {
-                'X-API-KEY': getNextApiKey(),
+                // 'X-API-KEY': getNextApiKey(),
                 'Content-Type': 'application/json',
               }
             });
