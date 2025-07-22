@@ -13,6 +13,7 @@ export default function MovieForm({ onAdd }) {
 
   };
 
+
   
 
 
