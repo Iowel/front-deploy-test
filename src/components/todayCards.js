@@ -77,7 +77,7 @@ const TodayCards = () => {
           // const response = await fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movieData.movieId}`, {
             const resp = await fetch(`/api/get-cache/${movieData.movieId}`, {
             headers: {
-              'X-API-KEY': 'f8730f72-a86f-42c5-971a-cbb75304a8b6',
+              'X-API-KEY': '48e848a4-1bc2-4ed7-9d15-d05f950d3f4f',
               'Content-Type': 'application/json',
             }
           });
