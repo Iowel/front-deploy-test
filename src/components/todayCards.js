@@ -52,43 +52,31 @@ const TodayCards = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchMovies = async () => {
+    const fetchMoviesByDate = async () => {
       try {
-        // Для страницы "Сегодня" используем текущую дату
         const targetDate = date || today;
-        
-        // Отладочная информация
-        console.log('URL параметр date:', date);
-        console.log('Текущая дата today:', today);
-        console.log('Целевая дата targetDate:', targetDate);
-        console.log('Доступные даты в ALL_MOVIES_DATA:', Object.keys(ALL_MOVIES_DATA));
-        
         const moviesForDate = ALL_MOVIES_DATA[targetDate] || [];
-        console.log('Найдены фильмы для даты', targetDate + ':', moviesForDate);
-        
+  
         if (!moviesForDate.length) {
-          console.log('Фильмы не найдены для даты:', targetDate);
           setMovies([]);
           setLoading(false);
           return;
         }
-
+  
         const moviePromises = moviesForDate.map(async (movieData) => {
-          // const response = await fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movieData.movieId}`, {
-            const resp = await fetch(`/api/get-cache/${movieData.movieId}`, {
-              headers: {
-                'Content-Type': 'application/json',
-              }
-            });
-            const movieInfo = await resp.json();
+          const resp = await fetch(`/api/get-cache/${movieData.movieId}`, {
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+          const movieInfo = await resp.json();
           return {
             ...movieInfo,
-            times: movieData.times
+            times: movieData.times,
           };
         });
-
+  
         const moviesData = await Promise.all(moviePromises);
-        console.log('Загруженные данные фильмов:', moviesData);
         setMovies(moviesData);
         setLoading(false);
       } catch (error) {
@@ -96,8 +84,8 @@ const TodayCards = () => {
         setLoading(false);
       }
     };
-
-    fetchMovies();
+  
+    fetchMoviesByDate();
   }, [date]);
 
   if (loading) return <Loader overlay={false} />;

@@ -209,46 +209,43 @@ const TestCards = () => {
         }
 
         const movieInfoCache = {};
-        for (const movieId of movieIds) {
-          const cacheKey = `movie_${movieId}`;
-          let info = CacheService.get(cacheKey);
-          if (!info) {
-            // const resp = await fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movieId}`, {
-              const resp = await fetch(`/api/get-cache/${movieId}`, {
-              headers: {
-                // 'X-API-KEY': getNextApiKey(),
-                'Content-Type': 'application/json',
-              }
-            });
-            if (resp.status === 429) { // Rate limit exceeded
-              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-              continue; // Retry with next API key
-            }
-            info = await resp.json();
-            CacheService.set(cacheKey, info, 3600); // Cache for 1 hour
+
+
+      for (const movieId of movieIds) {
+        const resp = await fetch(`/api/get-cache/${movieId}`, {
+          headers: {
+            'Content-Type': 'application/json',
           }
-          movieInfoCache[movieId] = info;
+        });
+
+        if (resp.status === 429) { // если лимит запросов
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
         }
 
-        const fetchPromises = manualMovies.map(async ({ movieId, date }) => {
+        const info = await resp.json();
+        movieInfoCache[movieId] = info;
+      }
+
+        for (const { movieId, date } of manualMovies) {
           const info = movieInfoCache[movieId];
           if (!newAllMoviesData[date]) newAllMoviesData[date] = [];
           if (!newAllMoviesData[date].some(m => m.movieId === movieId)) {
             newAllMoviesData[date].push({
               movieId,
-              nameRu: info.nameRu || '',
-              posterUrl: info.posterUrl || info.posterUrlPreview || '',
-              genres: info.genres || [],
+              nameRu: info?.nameRu || '',
+              posterUrl: info?.posterUrl || info?.posterUrlPreview || '',
+              genres: info?.genres || [],
               times: filterSessions(generateRandomSessions(), date),
-              date: date,
+              date,
               staff: []
             });
           }
-        });
+        }
 
-        await Promise.all(fetchPromises);
         setAllMoviesData(newAllMoviesData);
         setLoading(false);
+
       } catch (error) {
         console.error('Ошибка при загрузке фильмов:', error);
         setLoading(false);

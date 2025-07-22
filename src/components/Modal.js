@@ -63,27 +63,25 @@ export default function Modal({ open, onClose, movie, session, showStepper = tru
     if (open && movie?.movieId) {
       setDetails(null);
       setStaff([]);
-      // fetch(`https://kinopoiskapiunofficial.tech/api/v2.2/films/${movie.movieId}`, {
-        fetch(`/api/get-cache/${movie.movieId}`, {
+  
+      fetch(`/api/get-cache/${movie.movieId}`, {
         headers: {
-          // 'X-API-KEY': getNextApiKey(),
           'Content-Type': 'application/json',
         }
       })
         .then(res => res.json())
         .then(data => setDetails(data))
         .catch(() => setDetails(null));
-      // fetch(`https://kinopoiskapiunofficial.tech/api/v1/staff?filmId=${movie.movieId}`, {
-        fetch(`/api/get-staff/${movie.movieId}`, {
-          headers: {
-          // 'X-API-KEY': getNextApiKey(),
-            'Content-Type': 'application/json',
-          }
+  
+      fetch(`/api/get-staff/${movie.movieId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        }
       })
         .then(res => res.json())
         .then(data => setStaff(data))
         .catch(() => setStaff([]));
-      }
+    }
   }, [open, movie]);
 
 
