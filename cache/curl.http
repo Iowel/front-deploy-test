@@ -1,0 +1,58 @@
+
+
+###
+curl -X GET "https://kinopoiskapiunofficial.tech/api/v1/staff?filmId=5274400" \
+  -H "x-api-key: 48e848a4-1bc2-4ed7-9d15-d05f950d3f4f" \
+  -H "Content-Type: application/json"  
+
+
+###
+curl -X GET "https://kinopoiskapiunofficial.tech/api/v2.2/films/top?type=TOP_100_POPULAR_FILMS" \
+  -H "x-api-key: 48e848a4-1bc2-4ed7-9d15-d05f950d3f4f" \
+  -H "Content-Type: application/json"  
+
+
+
+
+
+
+
+###
+# Вместо 4476147 вставить нужный id
+curl http://localhost:8888/api/get-staff/4476147
+
+
+
+###
+# Вместо 4476147 вставить нужный id
+curl http://localhost:8888/api/get-cache/4476147
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# DELETE /api/delete-user/{id}
+###
+curl -X DELETE http://localhost:8888/api/delete-user/40
+
+
+
+
