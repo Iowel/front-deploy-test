@@ -9,8 +9,10 @@ function getRandomInt(min, max) {
 function getRandomUniqueIndexes(count, min, max) {
   const set = new Set();
   while (set.size < count) {
+    
     set.add(getRandomInt(min, max));
   }
+
 
   return Array.from(set);
 }
