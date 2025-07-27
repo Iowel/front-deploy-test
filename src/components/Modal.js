@@ -113,6 +113,7 @@ export default function Modal({ open, onClose, movie, session, showStepper = tru
 
   if (!open || !movie) return null;
 
+
   
   // Если movieId отсутствует или 0 — кастомная модалка (например, из карусели новостей)
   if (!movie.movieId) {
