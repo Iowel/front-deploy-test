@@ -7,10 +7,6 @@ const formatPrice = (price) => {
   return `${price} ₽`;
 };
 
-
-
-const CACHE_TTL = 3600; // время в секундах или миллисекундах
-
 // Фильтрация сеансов
 const filterSessions = (sessions, targetDate) => {
   const now = new Date();
@@ -95,7 +91,7 @@ function generateRandomSessions() {
 
 const TestCards = () => {
   const [movies, setMovies] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { date } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -155,7 +151,8 @@ const TestCards = () => {
     return getDateFromLocal(date);
   });
 
-
+  const [allMoviesData, setAllMoviesData] = useState({});
+  const [currentDate, setCurrentDate] = useState(todayFormatted);
 
   // Эффект для отслеживания смены дня
   useEffect(() => {
@@ -180,67 +177,74 @@ const TestCards = () => {
     return () => clearInterval(interval);
   }, [currentDate, date, navigate]);
 
-
-
-
-
-
-
-  const [currentDate, setCurrentDate] = useState(getDateFromLocal(getTodayLocal()));
-
-  const movieIds = [
-    4443734, 1237984, 5504100, 5518231, 5427621, 1115213,
-    1320476, 5965493, 4476147, 6224943, 7004437, 5001443,
-    5304486, 7224468
-  ];
-
   // Обновляем зависимости для загрузки фильмов
   useEffect(() => {
-    const fetchFilmsBulk = async () => {
-      setLoading(true);
-
-      const cachedMovies = [];
-      const uncachedIds = [];
-
-      // 1. Проверяем кэш
-      movieIds.forEach((movieId) => {
-        const cached = localStorage.getItem(`movie_${movieId}`);
-        if (cached) {
-          cachedMovies.push(JSON.parse(cached));
-        } else {
-          uncachedIds.push(movieId);
+    const fetchMovies = async () => {
+      try {
+        const newAllMoviesData = {};
+        const manualMovies = [];
+        const movieIds = [
+          4443734, 1237984, 5504100, 5518231, 5427621, 1115213, 1320476, 5965493, 4476147, 6224943, 7004437, 5001443, 5304486, 7224468
+        ];
+        const sessionTemplate = generateRandomSessions();
+        // Новый диапазон дат
+        const start = new Date('2025-07-22');
+        const end = new Date('2025-09-01');
+        let day = 0;
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1), day++) {
+          const dateStr = getDateFromLocal(new Date(d));
+          // Перемешиваем movieIds для каждого дня
+          const shuffledIds = [...movieIds];
+          for (let i = shuffledIds.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledIds[i], shuffledIds[j]] = [shuffledIds[j], shuffledIds[i]];
+          }
+          const idsForDay = shuffledIds.slice(0, 5);
+          newAllMoviesData[dateStr] = [];
+          for (let i = 0; i < 5; i++) {
+            const movieId = idsForDay[i];
+            let info = null;
+            const cached = localStorage.getItem(`movie_${movieId}`);
+            if (cached) {
+              info = JSON.parse(cached);
+            } else {
+              try {
+                const resp = await fetch(`/api/get-cache/${movieId}`);
+                if (resp.status === 429) { // Rate limit exceeded
+                  await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+                  continue; // Retry with next API key
+                }
+                info = await resp.json();
+                if (info) {
+                  localStorage.setItem(`movie_${movieId}`, JSON.stringify(info));
+                }
+              } catch (error) {
+                continue; // Skip this movie on error
+              }
+            }
+            if (info) {
+              newAllMoviesData[dateStr].push({
+                movieId,
+                nameRu: info.nameRu || '',
+                posterUrl: info.posterUrl || info.posterUrlPreview || '',
+                genres: info.genres || [],
+                times: filterSessions(generateRandomSessions(), dateStr),
+                date: dateStr,
+                staff: []
+              });
+            }
+          }
         }
-      });
 
-      let fetchedMovies = [];
-
-      // 2. Делаем один bulk-запрос для всех отсутствующих
-      if (uncachedIds.length > 0) {
-        try {
-          const params = new URLSearchParams();
-          uncachedIds.forEach((id) => params.append('ids', id));
-
-          const res = await fetch(`/api/get-caches?${params.toString()}`);
-          const data = await res.json();
-
-          // сохраняем в localStorage
-          data.forEach((movie) => {
-            localStorage.setItem(`movie_${movie.movieId}`, JSON.stringify(movie));
-          });
-
-          fetchedMovies = data;
-        } catch (err) {
-          console.error('Ошибка при загрузке фильмов:', err);
-        }
+        setAllMoviesData(newAllMoviesData);
+        setLoading(false);
+      } catch (error) {
+        setLoading(false);
       }
-
-      // 3. Объединяем и обновляем состояние
-      setMovies([...cachedMovies, ...fetchedMovies]);
-      setLoading(false);
     };
 
-    fetchFilmsBulk();
-  }, [movieIds]);
+    fetchMovies();
+  }, [currentDate]);
 
   // Обновляем эффект для отображения фильмов
   useEffect(() => {

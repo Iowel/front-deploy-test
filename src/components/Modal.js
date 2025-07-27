@@ -6,44 +6,6 @@ import StepConnector from './StepConnector';
 import SeatsGrid from './SeatsGrid';
 import Loader from './Loader';
 
-
-
-
-
-
-
-// Функция для получения фильма из кеша или с API
-async function fetchMovieWithCache(movieId) {
-  const cacheKey = `movie_${movieId}`;
-  const cached = localStorage.getItem(cacheKey);
-  
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch {
-      // Если невалидный JSON, очистить кеш
-      localStorage.removeItem(cacheKey);
-    }
-  }
-
-  // Если кеша нет, делаем запрос
-  try {
-    const response = await fetch(`/api/get-cache/${movieId}`, {
-      headers: { 'Content-Type': 'application/json' }
-    });
-    if (!response.ok) throw new Error('Ошибка сети');
-    const data = await response.json();
-    localStorage.setItem(cacheKey, JSON.stringify(data)); // Сохраняем в кеш
-    return data;
-  } catch (e) {
-    console.error(e);
-    return null;
-  }
-}
-
-
-
-
 // Форматирование цены
 const formatPrice = (price) => {
   return `${price} ₽`;
@@ -91,110 +53,63 @@ export default function Modal({ open, onClose, movie, session, showStepper = tru
   const onZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 1.5));
   const onZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.7));
 
-
-
-
-  
   // Загружаем подробную инфу о фильме по id и staff
   useEffect(() => {
-    if (!open || !movie?.movieId) return;
-  
-    setDetails(null);
-    setStaff([]);
-  
-    const cacheKeyDetails = `movie_${movie.movieId}`;
-    const cacheKeyStaff = `staff_${movie.movieId}`;
-  
-    // Вспомогательная async функция
-    async function fetchData() {
-      // Попытка взять детали из кеша
-      const cachedDetails = localStorage.getItem(cacheKeyDetails);
-      if (cachedDetails) {
-        try {
-          setDetails(JSON.parse(cachedDetails));
-        } catch {
-          localStorage.removeItem(cacheKeyDetails);
-        }
+    if (open && movie?.movieId) {
+      setDetails(null);
+      setStaff([]);
+      const cached = localStorage.getItem(`movie_${movie.movieId}`);
+      if (cached) {
+        setDetails(JSON.parse(cached));
       } else {
-        try {
-          const res = await fetch(`/api/get-cache/${movie.movieId}`, {
-            headers: { 'Content-Type': 'application/json' }
-          });
-          if (res.ok) {
-            const data = await res.json();
+        fetch(`/api/get-cache/${movie.movieId}`)
+          .then(res => res.json())
+          .then(data => {
             setDetails(data);
-            localStorage.setItem(cacheKeyDetails, JSON.stringify(data));
-          } else {
-            setDetails(null);
-          }
-        } catch {
-          setDetails(null);
-        }
+            try {
+              localStorage.setItem(`movie_${movie.movieId}`, JSON.stringify(data));
+            } catch (e) { /* ignore quota errors */ }
+          })
+          .catch(() => setDetails(null));
       }
-  
-      // Аналогично для staff
-      const cachedStaff = localStorage.getItem(cacheKeyStaff);
-      if (cachedStaff) {
-        try {
-          setStaff(JSON.parse(cachedStaff));
-        } catch {
-          localStorage.removeItem(cacheKeyStaff);
-        }
-      } else {
-        try {
-          const resStaff = await fetch(`/api/get-staff/${movie.movieId}`, {
-            headers: { 'Content-Type': 'application/json' }
-          });
-          if (resStaff.ok) {
-            const dataStaff = await resStaff.json();
-            setStaff(dataStaff);
-            localStorage.setItem(cacheKeyStaff, JSON.stringify(dataStaff));
-          } else {
-            setStaff([]);
+      fetch(`/api/get-staff/${movie.movieId}`, { 
+          headers: {
+          
+            'Content-Type': 'application/json',
           }
-        } catch {
-          setStaff([]);
-        }
+      })
+        .then(res => res.json())
+        .then(data => setStaff(data))
+        .catch(() => setStaff([]));
       }
-    }
-  
-    fetchData();
-  
   }, [open, movie]);
-  
-  // Второй эффект — для seats, без изменений, но с небольшим упрощением:
-  
+
+  // seats генерируем динамически для каждого фильма/сеанса
   useEffect(() => {
-    if (!open || !movie) return;
-  
-    setStatus(session ? STATUS.SEATS : STATUS.SESSION);
-    setSelectedSession(session || null);
-    setSelectedSeats([]);
-  
-    const cacheKey = session && session.time
-      ? `seats_${movie.movieId}_${session.date}_${session.time}`
-      : `seats_${movie.movieId}_default`;
-  
-    let cachedSeats = null;
-    try {
-      cachedSeats = JSON.parse(localStorage.getItem(cacheKey));
-    } catch {
-      cachedSeats = null;
+    if (open && movie) {
+      setStatus(session ? STATUS.SEATS : STATUS.SESSION);
+      setSelectedSession(session ? session : null);
+      setSelectedSeats([]);
+      // Ключ для кэша: movieId + date + time
+      let cacheKey;
+      if (session && session.time) {
+        cacheKey = `seats_${movie.movieId}_${session.date}_${session.time}`;
+      } else {
+        cacheKey = `seats_${movie.movieId}_default`;
+      }
+      let cachedSeats = JSON.parse(localStorage.getItem(cacheKey));
+      if (!cachedSeats) {
+        // Создаем массив всех мест, с случайными занятыми местами
+        cachedSeats = Array.from({ length: 9 * 14 }, (_, i) => ({
+          row: Math.floor(i / 14) + 1,
+          seat: (i % 14) + 1,
+          taken: Math.random() < 0.2 // 20% шанс что место занято
+        }));
+        localStorage.setItem(cacheKey, JSON.stringify(cachedSeats));
+      }
+      setSeats(cachedSeats);
     }
-  
-    if (!cachedSeats) {
-      cachedSeats = Array.from({ length: 9 * 14 }, (_, i) => ({
-        row: Math.floor(i / 14) + 1,
-        seat: (i % 14) + 1,
-        taken: Math.random() < 0.2 // 20% вероятность занятости места
-      }));
-      localStorage.setItem(cacheKey, JSON.stringify(cachedSeats));
-    }
-  
-    setSeats(cachedSeats);
-  
   }, [open, movie, session]);
-  
 
   if (!open || !movie) return null;
 

@@ -14,6 +14,7 @@ function getRandomUniqueIndexes(count, min, max) {
   return Array.from(set);
 }
 
+
 const Soon = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,33 +24,22 @@ const Soon = () => {
   useEffect(() => {
     const fetchMovies = async () => {
       try {
-        // Fetch топ-100
-        const topResp = await fetch('https://kinopoiskapiunofficial.tech/api/v2.2/films/top?type=TOP_100_POPULAR_FILMS', {
-          headers: {
-            'X-API-KEY': 'f8730f72-a86f-42c5-971a-cbb75304a8b6',
-            'Content-Type': 'application/json',
-          }
-        });
-        const topData = await topResp.json();
-        const films = topData.films || [];
-        let soonMovies = [];
-        if (films.length > 39) {
-          const max = Math.min(69, films.length - 1);
-          const indexes = getRandomUniqueIndexes(8, 39, max);
-          soonMovies = indexes.map(i => films[i]).filter(Boolean);
-        } else {
-          soonMovies = films.slice(0, 8);
-        }
-        const normalizeMovie = (m) => ({
-          ...m,
-          ratingKinopoisk: m.rating ?? null,
-          ratingImdb: m.ratingImdb ?? null,
-        });
-        const all = soonMovies.map(normalizeMovie).slice(0, 15);
-        setMovies(all);
+        const resp = await fetch('/api/get-popular');
+        const data = await resp.json();
+        const validMovies = Array.isArray(data.docs) ? data.docs.filter(movie => {
+          if (!movie) return false;
+          const poster = movie.poster;
+          if (!poster) return false;
+          if (!poster.url && !poster.previewUrl) return false;
+          if (poster.url === '' && poster.previewUrl === '') return false;
+          return true;
+        }) : [];
+        setMovies(validMovies);
+        try {
+          localStorage.setItem('soon_movies', JSON.stringify(validMovies));
+        } catch (e) { /* ignore quota errors */ }
         setLoading(false);
       } catch (error) {
-        console.error('Ошибка загрузки soon:', error);
         setLoading(false);
       }
     };
@@ -67,12 +57,12 @@ const Soon = () => {
           gap: 40,
           justifyContent: 'center',
         }}>
-          {movies.map((movie, idx) => {
+          {movies.map((movie) => {
             return (
               <div
-                key={movie.filmId || movie.kinopoiskId || idx}
+                key={movie.id}
                 style={{ width: 600, height: 420, position: 'relative', display: 'flex', alignItems: 'flex-start', background: 'white', borderRadius: 20, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', overflow: 'visible', marginBottom: 0 }}
-                onClick={() => { setModalMovie({ ...movie, movieId: movie.filmId || movie.kinopoiskId, genres: movie.genres || [], times: movie.times || [] }); setModalOpen(true); }}
+                onClick={() => { setModalMovie({ ...movie, movieId: movie.id, genres: movie.genres || [], times: movie.times || [] }); setModalOpen(true); }}
                 className="cursor-pointer"
               >
                 {/* Постер */}
@@ -80,23 +70,23 @@ const Soon = () => {
                   style={{ width: 320, height: 400, position: 'absolute', top: 10, left: -30, borderRadius: 18, overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
                 >
                   <img
-                    src={movie.posterUrl || movie.posterUrlPreview}
-                    alt={movie.nameRu || movie.nameEn || movie.nameOriginal || ''}
+                    src={movie.poster?.url || movie.poster?.previewUrl}
+                    alt={movie.name || movie.alternativeName || ''}
                     style={{ width: 320, height: 400, objectFit: 'cover', transition: 'transform 0.2s', willChange: 'transform' }}
                   />
                   {/* Возраст */}
                   <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(255,255,255,0.92)', color: '#222', fontWeight: 700, fontSize: 18, borderRadius: 8, padding: '2px 10px', zIndex: 2 }}>
-                    {movie.ratingAgeLimits ? movie.ratingAgeLimits.replace(/[^0-9+]/g, '') + '+' : (movie.year || '—')}
+                    {movie.ageRating ? movie.ageRating + '+' : (movie.year || '—')}
                   </div>
                 </div>
                 {/* Правая часть */}
                 <div style={{ flex: 1, height: 400, marginLeft: 320, marginTop: 30, marginBottom: 30, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-start', minWidth: 0, maxWidth: 240 }}>
                   {/* Название + Оценка */}
                   <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 10 }}>
-                    <div style={{ color: '#111', fontSize: 28, fontWeight: 700, maxWidth: 120, lineHeight: 1.1 }}>
-                      {movie.nameRu || movie.nameEn || movie.nameOriginal || ''}
+                    <div style={{ color: '#111', fontSize: 28, fontWeight: 700, maxWidth: 220, lineHeight: 1.1 }}>
+                      {movie.name || movie.alternativeName || ''}
                     </div>
-                    {movie.ratingKinopoisk != null && !isNaN(Number(movie.ratingKinopoisk)) && (
+                    {movie.rating?.kp != null && !isNaN(Number(movie.rating.kp)) && (
                       <div style={{
                         marginLeft: 8,
                         background: '#f3f3f3',
@@ -108,10 +98,10 @@ const Soon = () => {
                         display: 'flex',
                         alignItems: 'center'
                       }}>
-                        <span style={{marginRight: 4}}>KP:</span>{movie.ratingKinopoisk}
+                        <span style={{marginRight: 4}}>KP:</span>{movie.rating.kp}
                       </div>
                     )}
-                    {movie.ratingImdb != null && !isNaN(Number(movie.ratingImdb)) && (
+                    {movie.rating?.imdb != null && !isNaN(Number(movie.rating.imdb)) && (
                       <div style={{
                         marginLeft: 8,
                         background: '#f3f3f3',
@@ -123,13 +113,13 @@ const Soon = () => {
                         display: 'flex',
                         alignItems: 'center'
                       }}>
-                        <span style={{marginRight: 4}}>IMDb:</span>{movie.ratingImdb}
+                        <span style={{marginRight: 4}}>IMDb:</span>{movie.rating.imdb}
                       </div>
                     )}
                   </div>
                   {/* Жанры */}
                   <div style={{ color: '#888', fontSize: 18, marginTop: 18, marginBottom: 0, maxWidth: 220 }}>
-                    {Array.isArray(movie.genres) ? movie.genres.map((g) => g.genre).join(', ') : (movie.genres || []).join(', ')}
+                    {Array.isArray(movie.genres) ? movie.genres.map((g) => g.name).join(', ') : (movie.genres || []).join(', ')}
                   </div>
                 </div>
               </div>

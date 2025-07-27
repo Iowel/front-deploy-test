@@ -152,7 +152,7 @@ func (cache *redisCache) GetByStaffId(id string) []*film.Actor {
 	return actors
 }
 
-func (cache *redisCache) GetPopularFilms() *film.FilmListResponse {
+func (cache *redisCache) GetPopularFilms() []*film.Popular {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -167,16 +167,16 @@ func (cache *redisCache) GetPopularFilms() *film.FilmListResponse {
 		return nil
 	}
 
-	var films film.FilmListResponse
+	var films []*film.Popular
 	if err := json.Unmarshal([]byte(val), &films); err != nil {
 		log.Printf("failed to unmarshal popular films from key %s: %v", key, err)
 		return nil
 	}
 
-	return &films
+	return films
 }
 
-func (cache *redisCache) SetPopularFilms(key string, value *film.FilmListResponse) {
+func (cache *redisCache) SetPopularFilms(key string, value []*film.Popular) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -192,36 +192,36 @@ func (cache *redisCache) SetPopularFilms(key string, value *film.FilmListRespons
 	}
 }
 
-func (cache *redisCache) GetMultiple(keys []string) ([]*film.FilmResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+// func (cache *redisCache) GetMultiple(keys []string) ([]*film.FilmListResponse, error) {
+// 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+// 	defer cancel()
 
-	vals, err := cache.client.MGet(ctx, keys...).Result()
-	if err != nil {
-		return nil, err
-	}
+// 	vals, err := cache.client.MGet(ctx, keys...).Result()
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	films := make([]*film.FilmResponse, 0, len(vals))
-	for _, val := range vals {
-		if val == nil {
-			films = append(films, nil)
-			continue
-		}
+// 	films := make([]*film.FilmResponse, 0, len(vals))
+// 	for _, val := range vals {
+// 		if val == nil {
+// 			films = append(films, nil)
+// 			continue
+// 		}
 
-		strVal, ok := val.(string)
-		if !ok {
-			films = append(films, nil)
-			continue
-		}
+// 		strVal, ok := val.(string)
+// 		if !ok {
+// 			films = append(films, nil)
+// 			continue
+// 		}
 
-		var f film.FilmResponse
-		if err := json.Unmarshal([]byte(strVal), &f); err != nil {
-			films = append(films, nil)
-			continue
-		}
+// 		var f []*film.FilmListResponse
+// 		if err := json.Unmarshal([]byte(strVal), &f); err != nil {
+// 			films = append(films, nil)
+// 			continue
+// 		}
 
-		films = append(films, &f)
-	}
+// 		films = append(films, f)
+// 	}
 
-	return films, nil
-}
+// 	return films, nil
+// }

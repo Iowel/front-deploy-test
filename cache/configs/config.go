@@ -8,15 +8,20 @@ import (
 )
 
 type Config struct {
-	DB     Dbconfig
-	Auth   AuthConfig
-	Web    WebConfig
-	Redis  Redis
-	ApiKey ApiKey
+	DB                 Dbconfig
+	Auth               AuthConfig
+	Web                WebConfig
+	Redis              Redis
+	ApiKey             ApiKey
+	ApiKeyKinopoiskDev ApiKeyKinopoiskDev
 }
 
 type Dbconfig struct {
 	Dsn string
+}
+
+type ApiKeyKinopoiskDev struct {
+	Token string
 }
 
 type AuthConfig struct {
@@ -45,10 +50,11 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		DB:     Dbconfig{Dsn: os.Getenv("DB_DSN")},
-		Auth:   AuthConfig{Secret: os.Getenv("SECRET")},
-		Web:    WebConfig{Port: os.Getenv("PORT"), Api: os.Getenv("API"), Dsn: os.Getenv("DSN"), Env: os.Getenv("ENV")},
-		Redis:  Redis{Port: os.Getenv("REDIS_PORT")},
-		ApiKey: ApiKey{ApiKey: os.Getenv("KINOPOISK_API_KEY")},
+		DB:                 Dbconfig{Dsn: os.Getenv("DB_DSN")},
+		Auth:               AuthConfig{Secret: os.Getenv("SECRET")},
+		Web:                WebConfig{Port: os.Getenv("PORT"), Api: os.Getenv("API"), Dsn: os.Getenv("DSN"), Env: os.Getenv("ENV")},
+		Redis:              Redis{Port: os.Getenv("REDIS_PORT")},
+		ApiKey:             ApiKey{ApiKey: os.Getenv("KINOPOISK_API_KEY")},
+		ApiKeyKinopoiskDev: ApiKeyKinopoiskDev{Token: os.Getenv("KINOPOISK_DEV_API_KEY")},
 	}
 }

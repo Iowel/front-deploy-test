@@ -3,7 +3,6 @@ import React from 'react';
 export default function StepConnector({ leftStatus, rightStatus, isBlurred }) {
   // leftStatus/rightStatus: 'not-started' | 'active' | 'done'
   // Синий: #2563eb, Зелёный: #10b981, Серый: #e5e7eb
-  // console.log('StepConnector', { leftStatus, rightStatus });
   // Блюр не применяем к полоске, только к основному контенту
   return (
     <div className="relative flex items-center" style={{ width: 75, height: 5 }}>

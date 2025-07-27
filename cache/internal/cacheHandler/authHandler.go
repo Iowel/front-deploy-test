@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -30,8 +29,9 @@ func NewCacheHandler(router *http.ServeMux, cacheRepo cache.IPostCache, Config *
 	}
 
 	router.Handle("GET /api/get-cache/{id}", handler.FetchCache())
-	router.Handle("GET /api/get-caches", handler.FetchCachesBulk())
+	// router.Handle("GET /api/get-caches", handler.FetchCachesBulk())
 	router.Handle("GET /api/get-staff/{id}", handler.FetchStaff())
+	router.Handle("GET /api/get-popular", handler.FetchNewFilms())
 }
 
 func (h *cacheHandler) FetchCache() http.HandlerFunc {
@@ -77,7 +77,6 @@ func (h *cacheHandler) FetchCache() http.HandlerFunc {
 				return nil, err
 			}
 
-			// положим в кэш
 			h.Cache.Set(cacheKey, &film)
 
 			return &film, nil
@@ -89,6 +88,79 @@ func (h *cacheHandler) FetchCache() http.HandlerFunc {
 		}
 
 		response.Json(w, v, http.StatusOK)
+
+		log.Printf("Time Duration (api): %s", time.Since(start))
+	}
+}
+
+func (h *cacheHandler) FetchNewFilms() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		cacheKey := "popular"
+
+		if cached := h.Cache.GetPopularFilms(); cached != nil {
+			resp := film.PremieresResponse{
+				Total: len(cached),
+				Docs:  cached,
+			}
+			response.Json(w, resp, http.StatusOK)
+			return
+		}
+
+		var allFilms []*film.Popular
+		page := 1
+
+		for {
+			url := fmt.Sprintf("https://api.kinopoisk.dev/v1.4/movie?premiere.russia=15.09.2025-30.12.2025&year=2025&limit=100&page=%d", page)
+			req, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				http.Error(w, "failed to create request", http.StatusInternalServerError)
+				return
+			}
+			req.Header.Set("x-api-key", h.Config.ApiKeyKinopoiskDev.Token)
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				body, _ := io.ReadAll(resp.Body)
+				http.Error(w, fmt.Sprintf("api error: %s", string(body)), http.StatusInternalServerError)
+				return
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				http.Error(w, "failed to read response body", http.StatusInternalServerError)
+				return
+			}
+
+			var films film.PremieresResponse
+			if err := json.Unmarshal(body, &films); err != nil {
+				http.Error(w, "unmarshal error", http.StatusInternalServerError)
+				return
+			}
+
+			allFilms = append(allFilms, films.Docs...)
+
+			// Предполагается, что в film.PremieresResponse есть поле Pages int `json:"pages"`
+			if page >= films.Pages || films.Pages == 0 {
+				break
+			}
+			page++
+		}
+
+		h.Cache.SetPopularFilms(cacheKey, allFilms)
+
+		response.Json(w, film.PremieresResponse{
+			Total: len(allFilms),
+			Docs:  allFilms,
+		}, http.StatusOK)
 
 		log.Printf("Time Duration (api): %s", time.Since(start))
 	}
@@ -177,116 +249,111 @@ func (h *cacheHandler) FetchStaff() http.HandlerFunc {
 
 //////////////
 
-func (h *cacheHandler) FetchCachesBulk() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+// func (h *cacheHandler) FetchCachesBulk() http.HandlerFunc {
+// 	return func(w http.ResponseWriter, r *http.Request) {
+// 		start := time.Now()
 
-		idsParam := r.URL.Query().Get("ids")
-		if idsParam == "" {
-			http.Error(w, "ids param required", http.StatusBadRequest)
-			return
-		}
+// 		idsParam := r.URL.Query().Get("ids")
+// 		if idsParam == "" {
+// 			http.Error(w, "ids param required", http.StatusBadRequest)
+// 			return
+// 		}
 
-		idStrs := strings.Split(idsParam, ",")
-		if len(idStrs) == 0 {
-			http.Error(w, "ids param empty", http.StatusBadRequest)
-			return
-		}
+// 		idStrs := strings.Split(idsParam, ",")
+// 		if len(idStrs) == 0 {
+// 			http.Error(w, "ids param empty", http.StatusBadRequest)
+// 			return
+// 		}
 
-		keys := make([]string, 0, len(idStrs))
-		idInts := make([]int, 0, len(idStrs))
-		for _, idStr := range idStrs {
-			id, err := strconv.Atoi(strings.TrimSpace(idStr))
-			if err != nil {
-				continue // пропускаем невалидные ID
-			}
-			idInts = append(idInts, id)
-			keys = append(keys, fmt.Sprintf("film:%d", id))
-		}
+// 		keys := make([]string, 0, len(idStrs))
+// 		idInts := make([]int, 0, len(idStrs))
+// 		for _, idStr := range idStrs {
+// 			id, err := strconv.Atoi(strings.TrimSpace(idStr))
+// 			if err != nil {
+// 				continue
+// 			}
+// 			idInts = append(idInts, id)
+// 			keys = append(keys, fmt.Sprintf("film:%d", id))
+// 		}
 
-		// Получаем сразу все из кеша через MGET
-		filmsFromCache, err := h.Cache.GetMultiple(keys)
-		if err != nil {
-			http.Error(w, "failed to get from cache", http.StatusInternalServerError)
-			return
-		}
+// 		filmsFromCache, err := h.Cache.GetMultiple(keys)
+// 		if err != nil {
+// 			http.Error(w, "failed to get from cache", http.StatusInternalServerError)
+// 			return
+// 		}
 
-		// Найдем ID для которых в кеше nil
-		missingIDs := make([]int, 0)
-		for i, film := range filmsFromCache {
-			if film == nil {
-				missingIDs = append(missingIDs, idInts[i])
-			}
-		}
+// 		missingIDs := make([]int, 0)
+// 		for i, film := range filmsFromCache {
+// 			if film == nil {
+// 				missingIDs = append(missingIDs, idInts[i])
+// 			}
+// 		}
 
-		// Параллельно загружаем недостающие фильмы из API
-		type result struct {
-			film *film.FilmResponse
-			err  error
-		}
+// 		type result struct {
+// 			film *film.FilmResponse
+// 			err  error
+// 		}
 
-		concurrency := 10 // можно подстроить под сервер
-		sem := make(chan struct{}, concurrency)
-		resultsCh := make(chan result, len(missingIDs))
+// 		concurrency := 10
+// 		sem := make(chan struct{}, concurrency)
+// 		resultsCh := make(chan result, len(missingIDs))
 
-		for _, id := range missingIDs {
-			sem <- struct{}{}
-			go func(id int) {
-				defer func() { <-sem }()
-				f, err := h.fetchFilmFromAPI(id)
-				resultsCh <- result{film: f, err: err}
-			}(id)
-		}
+// 		for _, id := range missingIDs {
+// 			sem <- struct{}{}
+// 			go func(id int) {
+// 				defer func() { <-sem }()
+// 				f, err := h.fetchFilmFromAPI(id)
+// 				resultsCh <- result{film: f, err: err}
+// 			}(id)
+// 		}
 
-		// Собираем результаты
-		for i := 0; i < len(missingIDs); i++ {
-			res := <-resultsCh
-			if res.err == nil && res.film != nil {
-				// Кладем в кеш
-				key := fmt.Sprintf("film:%d", res.film.KinopoiskID)
-				h.Cache.Set(key, res.film)
-				// Добавляем в общий слайс
-				filmsFromCache = append(filmsFromCache, res.film)
-			}
-		}
+// 		for i := 0; i < len(missingIDs); i++ {
+// 			res := <-resultsCh
+// 			if res.err == nil && res.film != nil {
 
-		close(resultsCh)
-		close(sem)
+// 				key := fmt.Sprintf("film:%d", res.film.KinopoiskID)
+// 				h.Cache.Set(key, res.film)
 
-		response.Json(w, filmsFromCache, http.StatusOK)
-		log.Printf("Time Duration (bulk): %s", time.Since(start))
-	}
-}
+// 				filmsFromCache = append(filmsFromCache, res.film)
+// 			}
+// 		}
 
-// вынесем вызов API в отдельную функцию
-func (h *cacheHandler) fetchFilmFromAPI(id int) (*film.FilmResponse, error) {
-	url := fmt.Sprintf("https://kinopoiskapiunofficial.tech/api/v2.2/films/%d", id)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("X-API-KEY", h.Config.ApiKey.ApiKey)
-	req.Header.Set("Content-Type", "application/json")
+// 		close(resultsCh)
+// 		close(sem)
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+// 		response.Json(w, filmsFromCache, http.StatusOK)
+// 		log.Printf("Time Duration (bulk): %s", time.Since(start))
+// 	}
+// }
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("api status: %d", resp.StatusCode)
-	}
+// func (h *cacheHandler) fetchFilmFromAPI(id int) (*film.FilmResponse, error) {
+// 	url := fmt.Sprintf("https://kinopoiskapiunofficial.tech/api/v2.2/films/%d", id)
+// 	req, err := http.NewRequest("GET", url, nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	req.Header.Set("X-API-KEY", h.Config.ApiKey.ApiKey)
+// 	req.Header.Set("Content-Type", "application/json")
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
+// 	resp, err := http.DefaultClient.Do(req)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer resp.Body.Close()
 
-	var f film.FilmResponse
-	if err := json.Unmarshal(body, &f); err != nil {
-		return nil, err
-	}
+// 	if resp.StatusCode != http.StatusOK {
+// 		return nil, fmt.Errorf("api status: %d", resp.StatusCode)
+// 	}
 
-	return &f, nil
-}
+// 	body, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	var f film.FilmResponse
+// 	if err := json.Unmarshal(body, &f); err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &f, nil
+// }

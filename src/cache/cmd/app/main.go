@@ -2,8 +2,8 @@ package main
 
 import (
 	"cache/configs"
-	"cache/internal/cache"
 	cacheHandler "cache/internal/cacheHandler"
+	"cache/internal/cache"
 	"cache/pkg/middleware"
 	"log"
 	"net/http"
