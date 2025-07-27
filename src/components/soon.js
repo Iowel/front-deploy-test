@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import Modal from './Modal';
 import Loader from './Loader';
 
+
 function getRandomInt(min, max) {
-  
+
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
