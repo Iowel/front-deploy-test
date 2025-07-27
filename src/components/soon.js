@@ -12,6 +12,7 @@ function getRandomUniqueIndexes(count, min, max) {
     set.add(getRandomInt(min, max));
   }
   
+
   return Array.from(set);
 }
 
