@@ -14,6 +14,7 @@ function getRandomUniqueIndexes(count, min, max) {
   return Array.from(set);
 }
 
+
 const Soon = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
